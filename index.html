@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fast Image Scanner & Translator</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f9fafb; }
+    .drag-over { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+  </style>
+</head>
+
+<body class="flex items-center justify-center min-h-screen p-4">
+
+<div class="max-w-6xl w-full mx-auto">
+
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+    <h1 class="text-3xl font-extrabold">Fast Image Scanner & Translator</h1>
+
+    <select id="target-language" class="p-3 rounded-xl border">
+      <option>English</option>
+      <option>Hindi</option>
+      <option>Telugu</option>
+      <option>Tamil</option>
+      <option>Kannada</option>
+      <option>Malayalam</option>
+      <option>French</option>
+      <option>Spanish</option>
+      <option>German</option>
+    </select>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+    <!-- Image Upload -->
+    <div class="bg-white p-6 rounded-3xl shadow">
+      <div id="drop-zone"
+           class="border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer relative min-h-[350px]">
+
+        <div id="drop-zone-content">
+          <p class="text-xl font-bold mb-2">Upload an Image</p>
+          <p class="text-gray-500">
+            Drag & drop or <span id="browse" class="text-blue-600 underline">browse</span>
+          </p>
+        </div>
+
+        <img id="preview" class="hidden max-h-64 mx-auto mt-4 rounded-xl" />
+        <input id="file-input" type="file" accept="image/*" class="hidden" />
+
+        <!-- Loader -->
+        <div id="loader"
+             class="hidden absolute inset-0 bg-white/90 flex items-center justify-center rounded-2xl">
+          <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="bg-white p-8 rounded-3xl shadow">
+      <h2 class="text-2xl font-bold mb-4">Translated Text</h2>
+
+      <div id="output"
+           class="bg-gray-50 p-6 rounded-xl min-h-[200px] text-lg text-center italic">
+        Upload an image to see the result
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
+const browse = document.getElementById("browse");
+const preview = document.getElementById("preview");
+const loader = document.getElementById("loader");
+const output = document.getElementById("output");
+const languageSelect = document.getElementById("target-language");
+
+let currentFile = null;
+
+// Upload triggers
+browse.onclick = () => fileInput.click();
+dropZone.onclick = () => fileInput.click();
+
+// Drag events
+["dragover", "dragenter"].forEach(e =>
+  dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.add("drag-over"); })
+);
+
+["dragleave", "drop"].forEach(e =>
+  dropZone.addEventListener(e, ev => { ev.preventDefault(); dropZone.classList.remove("drag-over"); })
+);
+
+dropZone.addEventListener("drop", e => handleFile(e.dataTransfer.files[0]));
+fileInput.addEventListener("change", e => handleFile(e.target.files[0]));
+
+languageSelect.onchange = () => {
+  if (currentFile) translateImage();
+};
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith("image")) return;
+
+  currentFile = file;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.classList.remove("hidden");
+    translateImage();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function translateImage() {
+  loader.classList.remove("hidden");
+  output.classList.remove("italic");
+  output.textContent = "Processing...";
+
+  const reader = new FileReader();
+
+  reader.onload = async e => {
+    const base64 = e.target.result.split(",")[1];
+
+    const response = await fetch("http://localhost:3000/translate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image: base64,
+        language: languageSelect.value
+      })
+    });
+
+    const data = await response.json();
+    output.textContent =
+      data.result === "NO_TEXT_FOUND"
+        ? "No text detected in image."
+        : data.result;
+
+    loader.classList.add("hidden");
+  };
+
+  reader.readAsDataURL(currentFile);
+}
+</script>
+
+</body>
+</html>
